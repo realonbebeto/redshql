@@ -1,0 +1,27 @@
+[package]
+name = "redshqlx"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "redshql"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.103"
+arrow = "57.3.1"
+async-trait = "0.1.89"
+bytes = "1.12.0"
+futures = "0.3.32"
+parquet = { version = "57.3.1" }
+pgwire = "0.40.4"
+rust-s3 = "0.37.2"
+sqlparser = "0.62.0"
+tokio = { version = "1.52.3", features = ["full"] }
+tokio-postgres = "0.7.18"
+tracing = "0.1.44"
+tracing-bunyan-formatter = "0.3.10"
+tracing-subscriber = { version = "0.3.23", features = [
+    "registry",
+    "env-filter",
+] }

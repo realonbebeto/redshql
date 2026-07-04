@@ -10,6 +10,7 @@ pub struct S3Client {
 
 impl S3Client {
     pub async fn new(bucket_name: &str) -> anyhow::Result<Self> {
+        tracing::info!("Initializing S3 client");
         let endpoint = std::env::var("S3_ENDPOINT").context("S3_ENDPOINT not set")?;
         let access_key = std::env::var("MINIO_ROOT_USER").unwrap_or_else(|_| "minioadmin".into());
         let secret_key =
@@ -27,12 +28,18 @@ impl S3Client {
             None,
         )?;
 
-        let bucket = Bucket::new(bucket_name, region, credentials).map_err(|e| {
-            tracing::error!("Failed to create S3 bucket client: {e}");
-            anyhow::anyhow!("Failed to setup bucket: {e}")
-        })?;
+        tracing::info!(
+            "Using S3 bucket: {}, region-host: {}",
+            bucket_name,
+            region.host()
+        );
 
-        bucket.with_path_style();
+        let bucket = Bucket::new(bucket_name, region, credentials)
+            .map_err(|e| {
+                tracing::error!("Failed to create S3 bucket client: {e}");
+                anyhow::anyhow!("Failed to setup bucket: {e}")
+            })?
+            .with_path_style();
 
         Ok(S3Client {
             bucket: bucket_name.into(),
@@ -41,16 +48,17 @@ impl S3Client {
     }
 
     pub async fn get_object(&self, key: &str) -> anyhow::Result<Vec<u8>> {
+        tracing::info!("Downloading object '{}' from bucket '{}'", key, self.bucket);
         let response = self.inner.get_object(key).await?;
 
         if response.status_code() != 200 {
             tracing::error!(
-                "S3 upload returned status {}: {}",
+                "S3 get object returned status {}: {}",
                 response.status_code(),
                 String::from_utf8_lossy(response.as_slice())
             );
             return Err(anyhow::anyhow!(format!(
-                "S3 upload failed with status {}",
+                "S3 get_object failed with status {}",
                 response.status_code()
             )));
         }

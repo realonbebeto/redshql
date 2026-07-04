@@ -47,6 +47,8 @@ impl SimpleQueryHandler for RedshqlHandler {
     {
         let dialect = RedshiftSqlDialect {};
 
+        tracing::info!("{}", query);
+
         let start = Parser::parse_sql(&dialect, query).map_err(|e| {
             PgWireError::UserError(Box::new(ErrorInfo::new(
                 "ERROR".into(),
@@ -58,11 +60,11 @@ impl SimpleQueryHandler for RedshqlHandler {
         match start.first() {
             Some(Statement::Query(_)) => {
                 let result = execute_select(query, &self.pg).await?;
+                tracing::info!("SELECT executed");
 
                 Ok(vec![result])
             }
             Some(Statement::CreateTable(_)) => {
-                tracing::info!("{}", query);
                 let parser = Parser::new(&dialect).try_with_sql(query).map_err(|e| {
                     PgWireError::UserError(Box::new(ErrorInfo::new(
                         "ERROR".into(),
@@ -79,9 +81,11 @@ impl SimpleQueryHandler for RedshqlHandler {
                     )))
                 })?;
 
-                tracing::info!("Parsing create SQL");
+                tracing::info!("Parsing CREATE SQL");
 
                 let res = execute_create_table(create, &self.pg).await?;
+
+                tracing::info!("CREATE executed");
 
                 return Ok(vec![res]);
             }
@@ -94,6 +98,8 @@ impl SimpleQueryHandler for RedshqlHandler {
                     )))
                 })?;
 
+                tracing::info!("Parseing COPY SQL");
+
                 let r_copy = try_parse_redshift_copy(parser).map_err(|e| {
                     PgWireError::UserError(Box::new(ErrorInfo::new(
                         "ERROR".into(),
@@ -102,7 +108,7 @@ impl SimpleQueryHandler for RedshqlHandler {
                     )))
                 })?;
 
-                tracing::info!("Parsing copy SQL");
+                tracing::info!("Parsing COPY statement");
 
                 let n = execute_s3_copy(&r_copy, &self.pg).await.map_err(|e| {
                     PgWireError::UserError(Box::new(ErrorInfo::new(
@@ -111,6 +117,8 @@ impl SimpleQueryHandler for RedshqlHandler {
                         format!("Unsupported: {:?}", e),
                     )))
                 })?;
+
+                tracing::info!("COPY executed");
 
                 return Ok(vec![Response::Execution(Tag::new("copy").with_rows(n))]);
             }

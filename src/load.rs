@@ -132,15 +132,32 @@ pub async fn execute_create_table(
 pub async fn execute_s3_copy(copy: &RedshqlCopy, pg: &PgClient) -> anyhow::Result<usize> {
     let (bucket_name, prefix) = split_s3_uri(&copy.s3_uri)?;
 
+    tracing::info!("Resolved source URI: s3://{}/{}", bucket_name, prefix);
+
     let s3_client = S3Client::new(&bucket_name).await?;
+
+    tracing::info!("S3 client initialized");
 
     let mut failed_objects = 0usize;
 
     match &copy.format {
         CopyFormat::Parquet => {
+            tracing::info!("Loading Parquet source");
             let columns = fetch_table_columns(pg, &copy.table.to_string()).await?;
 
+            tracing::info!(
+                "Target table '{}' {}",
+                copy.table,
+                if columns.is_some() {
+                    "exists"
+                } else {
+                    "does not exist"
+                }
+            );
+
             let bytes = s3_client.get_object(&prefix).await?;
+
+            tracing::info!("File '{}' read", prefix);
 
             let cols = if let Some(cols) = columns {
                 cols
@@ -148,6 +165,8 @@ pub async fn execute_s3_copy(copy: &RedshqlCopy, pg: &PgClient) -> anyhow::Resul
                 let bytes = s3_client.get_object(&prefix).await?;
 
                 let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(bytes))?;
+
+                tracing::info!("Parquet read from bytes");
 
                 let fields: anyhow::Result<Vec<ColumnDef>> = reader
                     .schema()
@@ -160,6 +179,8 @@ pub async fn execute_s3_copy(copy: &RedshqlCopy, pg: &PgClient) -> anyhow::Resul
                         })
                     })
                     .collect();
+
+                tracing::info!("Fields collected from bytes");
 
                 let fields = fields?;
 
@@ -186,6 +207,7 @@ pub async fn execute_s3_copy(copy: &RedshqlCopy, pg: &PgClient) -> anyhow::Resul
             }
         }
         CopyFormat::Other(_) => {
+            tracing::info!("Handling Multiple Parquet");
             let k = s3_client.list(&prefix).await?;
 
             // Handle the where table does not exist
@@ -280,15 +302,17 @@ async fn create_table(pg: &PgClient, table: &str, columns: &[ColumnDef]) -> anyh
     let params = columns
         .iter()
         .fold(vec![], |mut acc, x| {
-            let col = format!("{} {}", x.name, x.pg_type.name());
+            let col = format!("{} {}", x.name.to_lowercase(), x.pg_type.name());
             acc.push(col);
             acc
         })
         .join(", ");
 
-    pg.client()
-        .execute(&format!("CREATE TABLE {} ($1);", table), &[&params])
-        .await?;
+    let sql = format!("CREATE TABLE {} ({});", table, params);
+
+    tracing::info!("{}", &sql);
+
+    pg.client().execute(&sql, &[]).await?;
 
     Ok(())
 }

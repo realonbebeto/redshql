@@ -7,6 +7,11 @@ edition = "2024"
 name = "redshql"
 path = "src/main.rs"
 
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
+
 [dependencies]
 anyhow = "1.0.103"
 arrow = "57.3.1"
@@ -24,4 +29,12 @@ tracing-bunyan-formatter = "0.3.10"
 tracing-subscriber = { version = "0.3.23", features = [
     "registry",
     "env-filter",
+] }
+sqlx = { version = "0.9.0", features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "chrono",
+    "uuid",
+    "json",
 ] }

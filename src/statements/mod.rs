@@ -30,6 +30,7 @@ pub enum RedshqlParseError {
 pub fn expect_word(parser: &mut Parser) -> Result<String, RedshqlParseError> {
     match parser.next_token().token {
         Token::Word(Word { value, .. }) => Ok(value),
+        Token::SemiColon => Ok("SemiColon".into()),
         other => Err(RedshqlParseError::Malformed(format!(
             "expected identifier, got {other:?}"
         ))),

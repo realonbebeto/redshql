@@ -31,7 +31,7 @@ async fn main() {
     //     );
     // }
 
-    sqlx::query("COPY messages FROM 's3://iggystaging/iggy/messages/019f4265-3ca5-71a1-bf24-5f96913d0a71.parquet' CREDENTIALS 'ACCESS_KEY_ID=admin; SECRET_ACCESS_KEY=password' FORMAT AS PARQUET REGION 'us-east-1'").execute(&pool).await.unwrap();
+    sqlx::query("COPY messages FROM 's3://iggystaging/iggy/messages/019f4265-3ca5-71a1-bf24-5f96913d0a71.parquet' CREDENTIALS 'ACCESS_KEY_ID=admin; SECRET_ACCESS_KEY=password' FORMAT AS PARQUET REGION 'us-east-1';").execute(&pool).await.unwrap();
 
     // sqlx::query(
     //     "CREATE TABLE IF NOT EXISTS my_table2 (

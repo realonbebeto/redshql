@@ -17,6 +17,7 @@ pub struct RedshqlCopy {
     pub format: CopyFormat,
     pub max_error: u32,
     pub region: Option<String>,
+    pub terminator: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -68,10 +69,13 @@ pub fn try_parse_redshift_copy(mut parser: Parser) -> Result<RedshqlCopy, Redshq
     let mut format = CopyFormat::Csv;
     let mut max_error = 0u32;
     let mut region = None;
+    let mut terminator = false;
 
     // Real Redshift COPY options are unordered after FROM — loop until EOF
     while parser.peek_token() != Token::EOF {
         let word = expect_word(&mut parser)?;
+
+        tracing::info!("{}", word);
 
         match word.to_uppercase().as_str() {
             "CREDENTIALS" | "IAM_ROLE" => {
@@ -98,6 +102,7 @@ pub fn try_parse_redshift_copy(mut parser: Parser) -> Result<RedshqlCopy, Redshq
             "DELIMITER" => {
                 parse_string_literal(&mut parser)?;
             }
+            "SEMICOLON" => terminator = true,
             unknown => {
                 return Err(RedshqlParseError::Malformed(format!(
                     "unsupported COPY clause: {unknown}"
@@ -113,6 +118,7 @@ pub fn try_parse_redshift_copy(mut parser: Parser) -> Result<RedshqlCopy, Redshq
         format,
         max_error,
         region,
+        terminator,
     })
 }
 

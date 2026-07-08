@@ -43,6 +43,7 @@ impl RedshqlHandler {
         Self { pg }
     }
 }
+
 #[async_trait]
 impl ExtendedQueryHandler for RedshqlHandler {
     type Statement = String;
@@ -80,6 +81,20 @@ impl ExtendedQueryHandler for RedshqlHandler {
     where
         C: ClientInfo + Unpin + Send + Sync,
     {
+        let dialect = RedshiftSqlDialect {};
+
+        let start = Parser::parse_sql(&dialect, &stmt.statement).map_err(|e| {
+            PgWireError::UserError(Box::new(ErrorInfo::new(
+                "ERROR".into(),
+                "26000".into(),
+                e.to_string(),
+            )))
+        })?;
+
+        if let Some(Statement::Copy { .. }) = start.first() {
+            return Ok(DescribeStatementResponse::new(vec![], vec![]));
+        }
+
         let prepared = self
             .pg
             .prepare(&stmt.statement)
@@ -113,6 +128,20 @@ impl ExtendedQueryHandler for RedshqlHandler {
     where
         C: ClientInfo + Unpin + Send + Sync,
     {
+        let dialect = RedshiftSqlDialect {};
+
+        let start = Parser::parse_sql(&dialect, &portal.statement.statement).map_err(|e| {
+            PgWireError::UserError(Box::new(ErrorInfo::new(
+                "ERROR".into(),
+                "26000".into(),
+                e.to_string(),
+            )))
+        })?;
+
+        if let Some(Statement::Copy { .. }) = start.first() {
+            return Ok(DescribePortalResponse::new(vec![]));
+        }
+
         let prepared = self
             .pg
             .prepare(&portal.statement.statement)
@@ -145,6 +174,7 @@ impl SimpleQueryHandler for RedshqlHandler {
         C: ClientInfo + ClientPortalStore + Unpin + Send + Sync,
         C::PortalStore: PortalStore,
     {
+        tracing::info!("HH");
         if query.trim().is_empty() {
             return Ok(vec![Response::EmptyQuery]);
         }
@@ -186,6 +216,7 @@ async fn execute_statement(query: &str, pg: &PgClient) -> PgWireResult<Response>
             execute_create_table(create, pg).await
         }
         Some(Statement::Copy { .. }) => {
+            tracing::info!("Try parsing");
             let parser = Parser::new(&dialect).try_with_sql(query).map_err(|e| {
                 PgWireError::UserError(Box::new(ErrorInfo::new(
                     "ERROR".into(),
@@ -193,6 +224,7 @@ async fn execute_statement(query: &str, pg: &PgClient) -> PgWireResult<Response>
                     e.to_string(),
                 )))
             })?;
+            tracing::info!("Parsing");
             let r_copy = try_parse_redshift_copy(parser).map_err(|e| {
                 PgWireError::UserError(Box::new(ErrorInfo::new(
                     "ERROR".into(),
@@ -200,6 +232,7 @@ async fn execute_statement(query: &str, pg: &PgClient) -> PgWireResult<Response>
                     format!("Unsupported: {:?}", e),
                 )))
             })?;
+            tracing::info!("Copy parsed");
             let n = execute_s3_copy(&r_copy, pg).await.map_err(|e| {
                 PgWireError::UserError(Box::new(ErrorInfo::new(
                     "ERROR".into(),

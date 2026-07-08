@@ -15,6 +15,7 @@ use arrow::{
     datatypes::DataType,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{StreamExt, pin_mut, stream};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use pgwire::{
@@ -130,6 +131,7 @@ pub async fn execute_create_table(
 }
 
 pub async fn execute_s3_copy(copy: &RedshqlCopy, pg: &PgClient) -> anyhow::Result<usize> {
+    dbg!(&copy);
     let (bucket_name, prefix) = split_s3_uri(&copy.s3_uri)?;
 
     tracing::info!("Resolved source URI: s3://{}/{}", bucket_name, prefix);
@@ -329,6 +331,7 @@ async fn load_one_object(
         .map(|v| format!("\"{}\"", v.name))
         .collect::<Vec<String>>()
         .join(", ");
+
     let types = columns
         .iter()
         .map(|v| v.pg_type.clone())
@@ -449,9 +452,12 @@ fn extract_row<'a>(
                     .downcast_ref::<TimestampMicrosecondArray>()
                     .unwrap();
                 if a.is_null(row) {
-                    Box::new(None::<i64>)
+                    Box::new(None::<chrono::DateTime<Utc>>)
                 } else {
-                    Box::new(a.value(row))
+                    let micros = a.value(row);
+                    let dt = chrono::DateTime::<Utc>::from_timestamp_micros(micros)
+                        .ok_or(anyhow::anyhow!("Invalid timestamp"))?;
+                    Box::new(dt)
                 }
             }
             other => anyhow::bail!(

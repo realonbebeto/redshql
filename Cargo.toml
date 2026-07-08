@@ -17,6 +17,7 @@ anyhow = "1.0.103"
 arrow = "57.3.1"
 async-trait = "0.1.89"
 bytes = "1.12.0"
+chrono = { version = "0.4.45" }
 futures = "0.3.32"
 parquet = { version = "57.3.1" }
 pgwire = "0.40.4"

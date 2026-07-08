@@ -2357,6 +2357,7 @@ dependencies = [
  "arrow",
  "async-trait",
  "bytes",
+ "chrono",
  "futures",
  "parquet",
  "pgwire",
